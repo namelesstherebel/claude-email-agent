@@ -1,28 +1,33 @@
-# SPEC_INVENTORY.md — Task Inventory and Spec Queue
+# SPEC_INVENTORY.md -- Specification Inventory
 
-> Version: 1.1.0 | Last updated: after email filter mode audit
+This file lists all feature specifications for the Claude Email Agent project.
+Each spec lives in the SPECS/ folder and describes one feature in detail.
 
 ---
 
-## Spec Status
+## Specifications
 
-| Spec ID | Name | Status | File |
+| ID | Title | Status | File |
 |---|---|---|---|
-| SPEC-001 | Gmail Polling Loop | complete | SPECS/SPEC-001-gmail-polling.md |
-| SPEC-002 | Claude Reply Generation | complete | SPECS/SPEC-002-claude-reply.md |
-| SPEC-003 | Send or Draft Handler | complete | SPECS/SPEC-003-send-or-draft.md |
-| SPEC-004 | Email Filter Mode | complete | SPECS/SPEC-004-email-filter-mode.md |
-| SPEC-005 | Persona Configuration | pending | SPECS/SPEC-005-persona-config.md |
-| SPEC-006 | Deployment Setup | pending | SPECS/SPEC-006-deployment.md |
+| SPEC-001 | Gmail Polling via Gmail API | Complete | SPECS/SPEC-001-gmail-polling.md |
+| SPEC-002 | Claude Reply Generation | Complete | SPECS/SPEC-002-claude-reply.md |
+| SPEC-003 | Send or Draft Mode | Complete | SPECS/SPEC-003-send-or-draft.md |
+| SPEC-004 | Email Filter Mode (Whitelist / Blocklist) | Complete | SPECS/SPEC-004-email-filter-mode.md |
+| SPEC-005 | Multi-Provider Email Support | Complete | SPECS/SPEC-005-multi-provider.md |
 
 ---
 
-## Pending
+## Status Definitions
 
-**SPEC-005: Persona Configuration**
-The specific persona, tone, and reply rules for this deployment.
-Blocked on: user completing `*onboard` Phase 2 (Context Engineering)
+- **Draft** -- written but not yet implemented
+- **In Progress** -- currently being implemented
+- **Complete** -- implemented and tested
+- **Deprecated** -- no longer active
 
-**SPEC-006: Deployment Setup**
-Document the specific deployment configuration for this installation.
-Blocked on: user completing `*onboard` Phase 5 (Environment Build)
+---
+
+## Summary
+
+SPEC-001 through SPEC-004 cover the core Gmail-based agent with filtering.
+SPEC-005 extends the agent to support Outlook, Yahoo, iCloud, and any IMAP provider
+without breaking the existing Gmail flow.
