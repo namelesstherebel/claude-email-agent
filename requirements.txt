@@ -1,12 +1,25 @@
 # claude-email-agent requirements
 
-# Anthropic SDK
+# ── Core ─────────────────────────────────────────────────────────────────────
+# Anthropic SDK (required for all providers)
 anthropic>=0.40.0
 
-# Google Gmail API
+# Environment variable loading (required for all providers)
+python-dotenv>=1.0.0
+
+# ── Gmail ────────────────────────────────────────────────────────────────────
+# Only needed when EMAIL_PROVIDER=gmail
+# Safe to install even if not using Gmail — zero impact on other providers
 google-api-python-client>=2.100.0
 google-auth-httplib2>=0.2.0
 google-auth-oauthlib>=1.1.0
 
-# Environment variable management
-python-dotenv>=1.0.0
+# ── Outlook / Microsoft 365 ──────────────────────────────────────────────────
+# Only needed when EMAIL_PROVIDER=outlook
+# msal: Microsoft Authentication Library (OAuth2 token acquisition)
+# requests: HTTP calls to Microsoft Graph API
+msal>=1.24.0
+requests>=2.31.0
+
+# ── Yahoo / iCloud / Custom IMAP ─────────────────────────────────────────────
+# imaplib and smtplib are Python standard library — no extra packages needed
