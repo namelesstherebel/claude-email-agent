@@ -1,302 +1,210 @@
 # Claude Email Agent
 
-**An AI assistant that reads your Gmail and drafts (or sends) replies for you — powered by Claude AI.**
-
-No coding knowledge required to get started. The setup wizard guides you through everything.
-
----
-
-## What Does This Do?
-
-Once set up, this agent:
-
-1. Watches your Gmail inbox for new emails
-2. Reads each email and generates a contextual, on-brand reply using Claude AI
-3. Either **saves the reply as a Gmail draft** (so you can review before sending) or **sends it automatically** (once you trust it)
-4. Labels processed emails in Gmail so you can track what it handled
-5. Continuously improves over time as you give it more context
+A smart, privacy-first email auto-reply agent powered by Claude AI.
+Set it up once, and it monitors your inbox and drafts (or sends) replies automatically --
+using your own writing style and judgment.
 
 ---
 
-## Before You Start — What You'll Need
+## Supported Email Providers
 
-You need three things. None of them cost much:
-
-| What | Where to get it | Cost |
+| Provider | Status | Auth Method |
 |---|---|---|
-| A **Google Cloud account** | [console.cloud.google.com](https://console.cloud.google.com) | Free |
-| An **Anthropic API key** | [console.anthropic.com](https://console.anthropic.com) | ~$4-5/month at typical usage |
-| **Python 3** installed | [python.org/downloads](https://www.python.org/downloads/) | Free |
+| Gmail | Supported | Google OAuth2 (credentials.json) |
+| Outlook / Microsoft 365 | Supported | Azure App Registration + MSAL |
+| Yahoo Mail | Supported | App Password + IMAP |
+| iCloud Mail | Supported | App-Specific Password + IMAP |
+| Any IMAP/SMTP provider | Supported | App Password + IMAP |
 
-The setup wizard will walk you through all three step by step.
+> **Note:** A Google Cloud account is only required for Gmail users.
+> An Azure account is only required for Outlook / Microsoft 365 users.
+> All other providers use standard IMAP -- no cloud account needed.
 
 ---
 
-## Quickstart (5 Steps)
+## What It Does
 
-### Step 1 — Get the code
+- Monitors your inbox for new emails
+- Uses Claude AI to read and understand each message
+- Drafts a reply (or sends it automatically, your choice)
+- Respects your filter rules -- only replies to the people you allow
+- Runs locally on your computer or on a server
+- Never stores your emails anywhere outside your own machine
 
-**Option A: Clone with Git**
+---
+
+## Before You Start
+
+You need the following before running setup:
+
+| Requirement | Who needs it | Where to get it |
+|---|---|---|
+| Anthropic API key | Everyone | https://console.anthropic.com/ |
+| Google Cloud project + credentials.json | Gmail users only | https://console.cloud.google.com/ |
+| Azure App Registration | Outlook users only | https://portal.azure.com/ |
+| App password from your email provider | Yahoo / iCloud / IMAP users | See setup wizard instructions |
+| Python 3.8 or newer | Everyone | https://python.org/downloads/ |
+
+> **New to this?** Don't worry. The setup wizard walks you through every step.
+> You do not need to be technical to get this running.
+
+---
+
+## Quick Start
+
+### Step 1 -- Get the code
+
+**Option A: Clone to a new folder with your own name**
 ```bash
-git clone https://github.com/YOUR_USERNAME/claude-email-agent.git
+git clone https://github.com/namelesstherebel/claude-email-agent.git my-email-agent
+cd my-email-agent
+```
+
+**Option B: Clone with the default name**
+```bash
+git clone https://github.com/namelesstherebel/claude-email-agent.git
 cd claude-email-agent
 ```
 
-**Option B: Download ZIP**
-- Click the green **Code** button on this page → **Download ZIP**
-- Unzip it somewhere on your computer
-- Open a terminal and `cd` into the folder
-
-### Step 2 — Run the setup wizard
+### Step 2 -- Run the setup wizard
 
 ```bash
 bash setup.sh
 ```
 
-The wizard will ask you 8 simple questions and handle everything else. It takes about 10-15 minutes.
+The wizard will:
+1. Ask which email provider you use
+2. Walk you through the credentials setup for that provider
+3. Ask for your Anthropic API key
+4. Set your reply mode (draft or send)
+5. Configure your email filters (who the agent replies to)
+6. Set your agent's name and persona
+7. Create your .env file automatically
+8. Install all Python dependencies
+9. Run a safety check before starting
 
-> **On Windows?** Use [Git Bash](https://gitforwindows.org/) or [WSL](https://docs.microsoft.com/en-us/windows/wsl/install) to run bash scripts.
-
-### Step 3 — Customize your agent persona
-
-Open `config.py` in any text editor and fill in the `SYSTEM_PROMPT` section.
-
-This is like writing a briefing for a human assistant — the more detail you give, the better the replies:
-
-```
-SYSTEM_PROMPT = """
-You are an email assistant for Sarah Chen at Bloom Consulting.
-
-## Your Tone and Style
-- Warm and professional
-- Keep replies under 100 words when possible
-- Always sign off: "Best, Sarah"
-
-## Your Role
-This inbox handles scheduling requests and project inquiries
-for a small consulting firm.
-
-## Business Hours
-Monday through Friday, 9am to 6pm Pacific Time.
-We typically respond within one business day.
-
-## Common Questions
-Q: What are your rates?
-A: Our rates start at $150/hour. Happy to send a full proposal.
-
-Q: Are you taking new clients?
-A: Yes! We have capacity for 2-3 new projects starting next quarter.
-"""
-```
-
-### Step 4 — Start the agent
+### Step 3 -- Start the agent
 
 ```bash
-python3 agent.py
-```
-
-You'll see it start up and begin watching your inbox. Press `Ctrl+C` to stop it.
-
-### Step 5 — Review the drafts
-
-Check your **Gmail Drafts folder**. You'll see Claude's replies waiting for you. Read a few, edit if needed, send the ones you like.
-
-Once you're comfortable with the quality after a few days, you can switch to auto-send by changing `REPLY_MODE=send` in your `.env` file.
-
----
-
-## Controlling Which Emails Get a Reply
-
-This is one of the most important settings. You have three options:
-
-### Option 1: Whitelist — Only reply to specific people ✅ Recommended
-
-The agent **only responds to emails from addresses you list**. Everyone else is ignored.
-
-Best for:
-- Starting out (safest option)
-- Using auto-send mode
-- Responding only to your team, clients, or known contacts
-
-Set in your `.env` file:
-```
-EMAIL_FILTER_MODE=whitelist
-ONLY_REPLY_TO=alice@company.com, bob@company.com, @trustedcorp.com
-```
-
-> You can use partial matches like `@trustedcorp.com` to whitelist an entire domain.
-
-### Option 2: Blocklist — Reply to everyone except spam/newsletters
-
-The agent replies to **all emails except** the ones you've blocked.
-
-Best for:
-- Customer support inboxes
-- Public-facing email addresses
-- When you want broad coverage
-
-Set in your `.env` file:
-```
-EMAIL_FILTER_MODE=blocklist
-IGNORE_SENDERS=noreply@,no-reply@,newsletter@,unsubscribe@
-```
-
-> The agent always blocks obvious auto-senders (mailer-daemon, postmaster, etc.) regardless of mode.
-
-### Option 3: All emails — No filter
-
-Replies to everything. **Not recommended** unless you know exactly what you're doing.
-
-```
-EMAIL_FILTER_MODE=all
+python agent.py
 ```
 
 ---
 
-## Draft Mode vs. Auto-Send
+## Safety Features
 
-| | Draft Mode | Auto-Send |
+The agent is designed to be safe by default:
+
+- **Draft mode by default** -- replies go to your Drafts folder, not your inbox
+- **Whitelist by default** -- only replies to email addresses you approve
+- **Pre-flight safety check** -- the agent refuses to start if dangerous settings are detected
+- **No hardcoded secrets** -- all credentials live in your .env file, never in code
+- **Gitignored by default** -- .env, credentials.json, and token.json are excluded from git
+
+**Dangerous combinations that are blocked:**
+- Auto-send + reply-to-all: blocked at startup
+- Whitelist mode + empty whitelist: blocked at startup
+
+---
+
+## Email Filter Modes
+
+Set EMAIL_FILTER_MODE in your .env file (the setup wizard sets this for you):
+
+| Mode | What it does | Best for |
 |---|---|---|
-| What happens | Claude writes the reply, saves it to Drafts | Claude writes AND sends the reply |
-| You review? | Yes — you decide whether to send | No — it goes out automatically |
-| Recommended for | Starting out, any inbox | Only after reviewing drafts for days/weeks |
-| How to set | `REPLY_MODE=draft` (default) | `REPLY_MODE=send` |
-
-**Always start in draft mode.** Switch to auto-send only after you've reviewed at least a week of draft replies and are happy with the quality.
+| whitelist | ONLY replies to addresses in ONLY_REPLY_TO | Starting out, auto-send, high safety |
+| blocklist | Replies to everyone EXCEPT addresses in IGNORE_SENDERS | Public/customer-facing inboxes |
+| all | Replies to every email (use with extreme caution) | Not recommended |
 
 ---
 
-## Running It in the Background
+## Configuration Reference
 
-### On your computer (keep it running after closing terminal)
-```bash
-nohup python3 agent.py > agent.log 2>&1 &
-```
-To stop it: `pkill -f agent.py`
+All settings live in your .env file. Copy .env.example to get started.
 
-### On a Linux server (runs 24/7, restarts automatically)
-
-1. Edit the paths in `deploy/claude-email-agent.service`
-2. Install it:
-```bash
-sudo cp deploy/claude-email-agent.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable claude-email-agent
-sudo systemctl start claude-email-agent
-```
-3. Check it's running: `sudo systemctl status claude-email-agent`
-4. View logs: `sudo journalctl -u claude-email-agent -f`
-
-### With Docker
-```bash
-docker build -t claude-email-agent .
-docker run -d \
-  --env-file .env \
-  -v $(pwd)/credentials.json:/app/credentials.json \
-  -v $(pwd)/token.json:/app/token.json \
-  claude-email-agent
-```
-
----
-
-## Improving Your Agent Over Time
-
-This repo includes [agent-onboarding](https://github.com/namelesstherebel/agent-onboarding) infrastructure. If you use **Claude Code**, you can run a guided 7-phase setup that deeply configures your agent:
-
-```
-*onboard
-```
-
-After any task, the agent surfaces suggestions for improvement:
-
-```
-*review
-```
-
----
-
-## All Settings Reference
-
-Edit these in your `.env` file (created by setup.sh):
-
-| Setting | What it does | Default |
+| Variable | Default | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Your Claude AI key | (required) |
-| `REPLY_MODE` | `draft` or `send` | `draft` |
-| `EMAIL_FILTER_MODE` | `whitelist`, `blocklist`, or `all` | `whitelist` |
-| `ONLY_REPLY_TO` | Emails to respond to (whitelist mode) | (empty) |
-| `IGNORE_SENDERS` | Patterns to never reply to | spam/auto-senders |
-| `POLL_INTERVAL_SECONDS` | How often to check Gmail | `60` |
-| `LABEL_AFTER_REPLY` | Gmail label to tag processed emails | `AI-Replied` |
-| `MODEL` | Claude model | `claude-haiku-4-5` |
-| `DEPLOY_MODE` | `local` or `server` | `local` |
+| EMAIL_PROVIDER | gmail | Your email provider (gmail/outlook/yahoo/icloud/imap) |
+| ANTHROPIC_API_KEY | (required) | Your Claude API key |
+| REPLY_MODE | draft | draft saves to Drafts, send sends immediately |
+| POLL_INTERVAL_SECONDS | 60 | How often to check for new email (seconds) |
+| EMAIL_FILTER_MODE | whitelist | Who the agent responds to |
+| ONLY_REPLY_TO | (empty) | Comma-separated whitelist of allowed senders |
+| IGNORE_SENDERS | noreply@ etc | Comma-separated blocklist of senders to skip |
+| AGENT_NAME | Email Assistant | Name used in Claude's system prompt |
+| AGENT_PERSONA | (default) | Personality/instructions for Claude |
+| DEPLOY_MODE | local | local or server |
+| OUTLOOK_CLIENT_ID | (outlook only) | Azure app client ID |
+| OUTLOOK_CLIENT_SECRET | (outlook only) | Azure app client secret |
+| OUTLOOK_TENANT_ID | (outlook only) | Azure tenant ID (or consumers) |
+| EMAIL_ADDRESS | (imap only) | Your email address |
+| EMAIL_APP_PASSWORD | (imap only) | App password from your provider |
+| IMAP_HOST | (imap only) | IMAP server hostname |
+| IMAP_PORT | 993 | IMAP port |
+| SMTP_HOST | (imap only) | SMTP server hostname |
+| SMTP_PORT | 587 | SMTP port |
 
 ---
 
-## Safety Checklist
+## Running on a Server
 
-Before going live, make sure you can check all of these:
+If you want the agent to run 24/7 without keeping your laptop open:
 
-- [ ] I started in **draft mode** and reviewed replies for several days
-- [ ] I'm using a **test Gmail account** first (not my main inbox)
-- [ ] I set up a **whitelist** or at minimum a blocklist
-- [ ] My **credentials.json** and **token.json** are in .gitignore (never committed)
-- [ ] My **API key** is in .env, not hardcoded in any file
-- [ ] I've customized the **SYSTEM_PROMPT** in config.py with real context
-- [ ] If using auto-send, I have a **whitelist** set
-
----
-
-## Cost
-
-At 100 emails per day using `claude-haiku-4-5` with prompt caching: **under $5/month**.
-
-This is because the agent uses a technique called **prompt caching** — your system prompt (the briefing you write) is cached by Anthropic and reused at 10% of the normal cost for every email after the first.
-
-The longer and more detailed your system prompt, the bigger the savings. A thorough 2,000-word briefing costs almost the same as a short one.
+1. Run bash setup.sh and choose server as your deployment mode
+2. The wizard will set up a systemd service (Linux) or give you Docker instructions
+3. See the deploy/ folder for the Dockerfile and service file
 
 ---
 
 ## Troubleshooting
 
-**"No module named X"** — Run `pip3 install -r requirements.txt`
+**credentials.json not found (Gmail)**
+Download it from Google Cloud Console > APIs and Services > Credentials.
+Save it in the same folder as agent.py.
 
-**"credentials.json not found"** — Make sure you downloaded and placed it in the project folder (see setup.sh Step 7)
+**MSAL error or authentication failed (Outlook)**
+Double-check your OUTLOOK_CLIENT_ID, OUTLOOK_CLIENT_SECRET, and OUTLOOK_TENANT_ID in .env.
+Personal accounts (outlook.com, hotmail.com) should use OUTLOOK_TENANT_ID=consumers.
 
-**"Token has been expired"** — Delete `token.json` and run the agent again. It will re-open the browser to re-authorize.
+**IMAP login failed (Yahoo, iCloud, custom)**
+Make sure you are using an app password, not your regular account password.
+App passwords are different from your login password.
 
-**"Access blocked: app not verified"** — In Google Cloud Console, add your Gmail address as a test user under APIs & Services > OAuth consent screen > Test users.
+**Agent starts but sends no replies**
+Check EMAIL_FILTER_MODE and ONLY_REPLY_TO in your .env.
+If whitelist mode is on, the sender must be in ONLY_REPLY_TO.
 
-**Agent not responding to emails** — Check `agent.log` for errors. Also confirm your `EMAIL_FILTER_MODE` and `ONLY_REPLY_TO` settings — the email may be getting filtered.
-
-**Replies sound generic** — Add more detail to `SYSTEM_PROMPT` in `config.py`. Include FAQs, example replies, and specific business context.
+**Want to reset everything?**
+Delete your .env file and run bash setup.sh again.
 
 ---
 
-## File Structure
+## Project Structure
 
 ```
 claude-email-agent/
-├── agent.py             # Main loop — run this to start the agent
-├── gmail_client.py      # Gmail API helpers
-├── claude_agent.py      # Claude AI reply generation
-├── config.py            # ⭐ Main config — customize SYSTEM_PROMPT here
-├── setup.sh             # Setup wizard — run this first
-├── requirements.txt     # Python packages
-├── .env.example         # Settings template (copy to .env)
-├── .gitignore           # Keeps secrets out of git
-├── deploy/
-│   ├── Dockerfile                    # Docker deployment
-│   └── claude-email-agent.service    # Linux systemd service
-├── CLAUDE.md            # Agent context for Claude Code users
-├── INTENT.md            # Agent trade-off rules
-├── SPECS/               # Technical specs for each feature
-└── CONTEXT/
-    └── email-agent-research.md  # Architecture and cost details
+  agent.py              -- Main agent loop
+  email_client.py       -- Email provider abstraction (Gmail, Outlook, IMAP)
+  gmail_client.py       -- Gmail-specific OAuth2 helpers
+  claude_agent.py       -- Claude AI integration
+  config.py             -- Config loader and filter logic
+  setup.sh              -- Interactive setup wizard
+  requirements.txt      -- Python dependencies
+  .env.example          -- Template for your .env file
+  .env                  -- Your actual config (gitignored)
+  CLAUDE.md             -- Claude AI context and conventions
+  deploy/               -- Docker and systemd deployment files
+  SPECS/                -- Feature specifications
+  CONTEXT/              -- Research and background notes
 ```
 
 ---
 
 ## License
 
-MIT
+MIT -- see LICENSE file.
+
+---
+
+> Built with the [agent-onboarding](https://github.com/namelesstherebel/agent-onboarding) framework.
