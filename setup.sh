@@ -18,27 +18,9 @@ print_header() {
   echo "$(echo "$1" | sed "s/./─/g")"
 }
 
-print_step() {
-  echo ""
-  echo "${BOLD}${GREEN}▶ $1${RESET}"
-}
-
-print_info() {
-  echo "  ${CYAN}ℹ${RESET}  $1"
-}
-
-print_warn() {
-  echo "  ${YELLOW}⚠${RESET}  $1"
-}
-
-print_ok() {
-  echo "  ${GREEN}✓${RESET}  $1"
-}
-
-ask() {
-  echo ""
-  printf "  ${BOLD}$1${RESET} "
-}
+print_ok()   { echo "  ${GREEN}✓${RESET}  $1"; }
+print_warn() { echo "  ${YELLOW}⚠${RESET}  $1"; }
+print_info() { echo "  ${CYAN}ℹ${RESET}  $1"; }
 
 # ─── Welcome ──────────────────────────────────────────────────────────────────
 clear 2>/dev/null || true
@@ -47,8 +29,8 @@ echo "${BOLD}${CYAN}"
 echo "  ╔══════════════════════════════════════════════════════════╗"
 echo "  ║           Claude Email Agent — Setup Wizard             ║"
 echo "  ║                                                          ║"
-echo "  ║  This wizard will help you set up your AI email agent.  ║"
-echo "  ║  It takes about 10-15 minutes. No coding required.      ║"
+echo "  ║  Supports: Gmail · Outlook · Yahoo · iCloud · Any IMAP  ║"
+echo "  ║  No coding required. Takes about 10-15 minutes.         ║"
 echo "  ╚══════════════════════════════════════════════════════════╝"
 echo "${RESET}"
 echo "  Press ENTER at any prompt to accept the default value shown in [brackets]."
@@ -56,7 +38,7 @@ echo ""
 read -rp "  Ready? Press ENTER to begin..." _unused
 
 # ─── Step 1: Folder/Project Name ──────────────────────────────────────────────
-print_header "Step 1 of 8: Name Your Agent"
+print_header "Step 1 of 9: Name Your Agent"
 echo ""
 echo "  This folder is currently named: ${BOLD}$(basename "$(pwd)")${RESET}"
 echo ""
@@ -81,7 +63,7 @@ else
 fi
 
 # ─── Step 2: Check Python ─────────────────────────────────────────────────────
-print_header "Step 2 of 8: Checking Your Computer"
+print_header "Step 2 of 9: Checking Your Computer"
 echo ""
 echo "  Checking for Python (required to run the agent)..."
 if ! command -v python3 &>/dev/null; then
@@ -99,8 +81,232 @@ PYTHON=$(command -v python3)
 PY_VERSION=$($PYTHON --version 2>&1)
 print_ok "Python found: $PY_VERSION"
 
-# ─── Step 3: Deployment location ──────────────────────────────────────────────
-print_header "Step 3 of 8: Where Will the Agent Run?"
+# ─── Step 3: Email Provider ───────────────────────────────────────────────────
+print_header "Step 3 of 9: Which Email Provider Are You Using?"
+echo ""
+echo "  ${BOLD}1) Gmail${RESET}                      (Google account — gmail.com)"
+echo "  ${BOLD}2) Outlook / Microsoft 365${RESET}    (work or personal — outlook.com, hotmail.com)"
+echo "  ${BOLD}3) Yahoo Mail${RESET}                 (yahoo.com)"
+echo "  ${BOLD}4) iCloud Mail${RESET}                (Apple — icloud.com, me.com)"
+echo "  ${BOLD}5) Other / Custom IMAP${RESET}        (Zoho, Fastmail, ProtonMail Bridge, corporate)"
+echo ""
+read -rp "  Choose [1-5, default: 1]: " provider_choice
+
+# Initialise credential variables (will be filled per provider)
+EMAIL_PROVIDER=""
+IMAP_HOST=""
+IMAP_PORT="993"
+SMTP_HOST=""
+SMTP_PORT="587"
+EMAIL_ADDRESS=""
+EMAIL_APP_PASSWORD=""
+OUTLOOK_CLIENT_ID=""
+OUTLOOK_CLIENT_SECRET=""
+OUTLOOK_TENANT_ID=""
+MISSING_CREDS=false
+
+case "$provider_choice" in
+
+  # ── Gmail ──────────────────────────────────────────────────────────────────
+  1|"")
+    EMAIL_PROVIDER="gmail"
+    print_ok "Email provider: Gmail"
+    echo ""
+    echo "  ${BOLD}Gmail uses Google OAuth2 — your password is never shared.${RESET}"
+    echo "  We will walk you through creating a credentials.json file in Step 8."
+    ;;
+
+  # ── Outlook / Microsoft 365 ────────────────────────────────────────────────
+  2)
+    EMAIL_PROVIDER="outlook"
+    print_ok "Email provider: Outlook / Microsoft 365"
+    echo ""
+    print_header "  Outlook Setup: Azure App Registration"
+    echo ""
+    echo "  Outlook uses Microsoft Graph API. You need to register an app in Azure."
+    echo "  This sounds technical but just means filling out a form — follow these steps:"
+    echo ""
+    echo "  ${BOLD}1.${RESET} Go to: ${CYAN}https://portal.azure.com${RESET}"
+    echo "     Sign in with the Microsoft account that owns the inbox."
+    echo ""
+    echo "  ${BOLD}2.${RESET} In the search bar, type "App registrations" and click it."
+    echo "     Click ${BOLD}+ New registration${RESET}."
+    echo "     - Name: anything (e.g. "Email Agent")"
+    echo "     - Supported account types: "Accounts in any organizational directory"
+    echo "       and personal Microsoft accounts" (covers both work and personal)"
+    echo "     - Redirect URI: select "Public client/native" and enter: http://localhost"
+    echo "     Click ${BOLD}Register${RESET}."
+    echo ""
+    echo "  ${BOLD}3.${RESET} On the app overview page, copy these two values:"
+    echo "     - Application (client) ID"
+    echo "     - Directory (tenant) ID"
+    echo "     ${YELLOW}Note: if this is a personal outlook.com/hotmail.com account,"
+    echo "     use "consumers" as the Tenant ID instead of the GUID shown.${RESET}"
+    echo ""
+    echo "  ${BOLD}4.${RESET} Go to ${BOLD}Certificates & secrets${RESET} > ${BOLD}+ New client secret${RESET}."
+    echo "     Give it a description, choose an expiry, click Add."
+    echo "     ${RED}Copy the "Value" immediately — you cannot see it again after leaving this page.${RESET}"
+    echo ""
+    echo "  ${BOLD}5.${RESET} Go to ${BOLD}API permissions${RESET} > ${BOLD}+ Add a permission${RESET} > ${BOLD}Microsoft Graph${RESET} > ${BOLD}Delegated${RESET}."
+    echo "     Add these permissions: Mail.Read  Mail.Send  Mail.ReadWrite  offline_access"
+    echo "     Then click ${BOLD}Grant admin consent${RESET} (work tenants may need IT admin approval)."
+    echo ""
+    echo "  ─────────────────────────────────────────────────────────────────"
+    read -rp "  Press ENTER when you have your Client ID, Tenant ID, and Client Secret..." _unused
+    echo ""
+    read -rp "  Application (Client) ID: " OUTLOOK_CLIENT_ID
+    while [ -z "$OUTLOOK_CLIENT_ID" ]; do
+      print_warn "Client ID cannot be empty."
+      read -rp "  Application (Client) ID: " OUTLOOK_CLIENT_ID
+    done
+    read -rp "  Directory (Tenant) ID [or type "consumers" for personal accounts]: " OUTLOOK_TENANT_ID
+    while [ -z "$OUTLOOK_TENANT_ID" ]; do
+      print_warn "Tenant ID cannot be empty."
+      read -rp "  Directory (Tenant) ID: " OUTLOOK_TENANT_ID
+    done
+    read -rp "  Client Secret Value: " OUTLOOK_CLIENT_SECRET
+    while [ -z "$OUTLOOK_CLIENT_SECRET" ]; do
+      print_warn "Client secret cannot be empty."
+      read -rp "  Client Secret Value: " OUTLOOK_CLIENT_SECRET
+    done
+    print_ok "Outlook credentials saved."
+    ;;
+
+  # ── Yahoo Mail ─────────────────────────────────────────────────────────────
+  3)
+    EMAIL_PROVIDER="yahoo"
+    IMAP_HOST="imap.mail.yahoo.com"
+    IMAP_PORT="993"
+    SMTP_HOST="smtp.mail.yahoo.com"
+    SMTP_PORT="587"
+    print_ok "Email provider: Yahoo Mail"
+    echo ""
+    print_header "  Yahoo Mail Setup: App Password"
+    echo ""
+    echo "  Yahoo requires an "App Password" — a special password just for this agent."
+    echo "  Your main Yahoo password is never used or stored."
+    echo ""
+    echo "  ${BOLD}1.${RESET} Go to: ${CYAN}https://myaccount.yahoo.com/security${RESET}"
+    echo "     (Sign in to your Yahoo account if needed)"
+    echo ""
+    echo "  ${BOLD}2.${RESET} Scroll down to "App passwords" and click ${BOLD}Generate app password${RESET}."
+    echo "     - Select "Other app" from the dropdown"
+    echo "     - Type a name: Email Agent"
+    echo "     - Click ${BOLD}Generate${RESET}"
+    echo "     ${RED}Copy the 16-character password — you will not see it again.${RESET}"
+    echo ""
+    echo "  ${BOLD}3.${RESET} Make sure IMAP is enabled:"
+    echo "     Yahoo Mail > Settings (gear icon) > More Settings > Mailboxes"
+    echo "     Make sure the IMAP toggle is ON."
+    echo ""
+    echo "  ─────────────────────────────────────────────────────────────────"
+    read -rp "  Press ENTER when you have your app password ready..." _unused
+    echo ""
+    read -rp "  Your Yahoo email address: " EMAIL_ADDRESS
+    while [ -z "$EMAIL_ADDRESS" ]; do
+      print_warn "Email address cannot be empty."
+      read -rp "  Your Yahoo email address: " EMAIL_ADDRESS
+    done
+    read -rp "  Your 16-character app password: " EMAIL_APP_PASSWORD
+    while [ -z "$EMAIL_APP_PASSWORD" ]; do
+      print_warn "App password cannot be empty."
+      read -rp "  Your 16-character app password: " EMAIL_APP_PASSWORD
+    done
+    print_ok "Yahoo credentials saved."
+    ;;
+
+  # ── iCloud Mail ────────────────────────────────────────────────────────────
+  4)
+    EMAIL_PROVIDER="icloud"
+    IMAP_HOST="imap.mail.me.com"
+    IMAP_PORT="993"
+    SMTP_HOST="smtp.mail.me.com"
+    SMTP_PORT="587"
+    print_ok "Email provider: iCloud Mail"
+    echo ""
+    print_header "  iCloud Mail Setup: App-Specific Password"
+    echo ""
+    echo "  iCloud requires an "App-Specific Password" for third-party apps."
+    echo "  Your Apple ID password is never used or stored."
+    echo ""
+    echo "  ${BOLD}1.${RESET} Go to: ${CYAN}https://appleid.apple.com${RESET}"
+    echo "     Sign in with your Apple ID."
+    echo ""
+    echo "  ${BOLD}2.${RESET} Click ${BOLD}Sign-In and Security${RESET} > ${BOLD}App-Specific Passwords${RESET}."
+    echo "     Click the ${BOLD}+${RESET} button."
+    echo "     Name it: Email Agent"
+    echo "     ${RED}Copy the generated password — it looks like: xxxx-xxxx-xxxx-xxxx${RESET}"
+    echo ""
+    echo "  ${BOLD}3.${RESET} Make sure iCloud Mail / IMAP is enabled:"
+    echo "     On iPhone: Settings > [Your Name] > iCloud > Mail (toggle ON)"
+    echo "     On Mac: System Settings > Apple ID > iCloud > Mail (check ON)"
+    echo "     Or at: iCloud.com > Settings > Mail (toggle ON)"
+    echo ""
+    echo "  ${BOLD}4.${RESET} Your username is your full iCloud email address:"
+    echo "     e.g.  you@icloud.com  or  you@me.com  or  you@mac.com"
+    echo ""
+    echo "  ─────────────────────────────────────────────────────────────────"
+    read -rp "  Press ENTER when you have your app-specific password ready..." _unused
+    echo ""
+    read -rp "  Your iCloud email address (e.g. you@icloud.com): " EMAIL_ADDRESS
+    while [ -z "$EMAIL_ADDRESS" ]; do
+      print_warn "Email address cannot be empty."
+      read -rp "  Your iCloud email address: " EMAIL_ADDRESS
+    done
+    read -rp "  Your app-specific password (xxxx-xxxx-xxxx-xxxx): " EMAIL_APP_PASSWORD
+    while [ -z "$EMAIL_APP_PASSWORD" ]; do
+      print_warn "App-specific password cannot be empty."
+      read -rp "  Your app-specific password: " EMAIL_APP_PASSWORD
+    done
+    print_ok "iCloud credentials saved."
+    ;;
+
+  # ── Other / Custom IMAP ────────────────────────────────────────────────────
+  5)
+    EMAIL_PROVIDER="imap"
+    print_ok "Email provider: Custom IMAP/SMTP"
+    echo ""
+    print_header "  Custom IMAP Setup"
+    echo ""
+    echo "  Common providers and their settings:"
+    echo "    Zoho Mail:           imap.zoho.com  :993  /  smtp.zoho.com  :587"
+    echo "    Fastmail:            imap.fastmail.com:993 /  smtp.fastmail.com:587"
+    echo "    ProtonMail Bridge:   127.0.0.1      :1143  /  127.0.0.1     :1025"
+    echo "    Corporate / Other:   check with your IT department or provider docs"
+    echo ""
+    read -rp "  IMAP host (e.g. imap.yourdomain.com): " IMAP_HOST
+    while [ -z "$IMAP_HOST" ]; do
+      print_warn "IMAP host cannot be empty."
+      read -rp "  IMAP host: " IMAP_HOST
+    done
+    read -rp "  IMAP port [default: 993]: " IMAP_PORT
+    IMAP_PORT="${IMAP_PORT:-993}"
+    read -rp "  SMTP host (e.g. smtp.yourdomain.com): " SMTP_HOST
+    while [ -z "$SMTP_HOST" ]; do
+      print_warn "SMTP host cannot be empty."
+      read -rp "  SMTP host: " SMTP_HOST
+    done
+    read -rp "  SMTP port [default: 587]: " SMTP_PORT
+    SMTP_PORT="${SMTP_PORT:-587}"
+    read -rp "  Your email address: " EMAIL_ADDRESS
+    while [ -z "$EMAIL_ADDRESS" ]; do
+      print_warn "Email address cannot be empty."
+      read -rp "  Your email address: " EMAIL_ADDRESS
+    done
+    echo "  Enter your password or app password for this email account."
+    echo "  (Many providers require an app password, not your main login password.)"
+    read -rp "  Password or app password: " EMAIL_APP_PASSWORD
+    while [ -z "$EMAIL_APP_PASSWORD" ]; do
+      print_warn "Password cannot be empty."
+      read -rp "  Password or app password: " EMAIL_APP_PASSWORD
+    done
+    print_ok "IMAP credentials saved."
+    ;;
+
+esac
+
+# ─── Step 4: Deployment location ──────────────────────────────────────────────
+print_header "Step 4 of 9: Where Will the Agent Run?"
 echo ""
 echo "  ${BOLD}Option 1 — My computer (local)${RESET}"
 echo "    The agent runs while your computer is on and this terminal is open."
@@ -117,11 +323,11 @@ case "$deploy_choice" in
 esac
 print_ok "Deploy mode: $DEPLOY_MODE"
 
-# ─── Step 4: Reply mode ───────────────────────────────────────────────────────
-print_header "Step 4 of 8: Draft or Auto-Send?"
+# ─── Step 5: Reply mode ───────────────────────────────────────────────────────
+print_header "Step 5 of 9: Draft or Auto-Send?"
 echo ""
 echo "  ${BOLD}Option 1 — Save as drafts (STRONGLY RECOMMENDED)${RESET}"
-echo "    Claude writes the reply, but saves it to your Gmail Drafts folder."
+echo "    Claude writes the reply, but saves it to your Drafts folder."
 echo "    You review it, then decide whether to send it yourself."
 echo "    Start here. You can switch to auto-send after you trust the replies."
 echo ""
@@ -131,7 +337,7 @@ echo "    ${YELLOW}⚠  Only enable this after reviewing at least a week of draf
 echo ""
 read -rp "  Choose [1/2, default: 1]: " reply_choice
 case "$reply_choice" in
-  2) 
+  2)
     REPLY_MODE="send"
     echo ""
     print_warn "You chose auto-send. We will set up an email whitelist to keep it safe."
@@ -140,13 +346,12 @@ case "$reply_choice" in
 esac
 print_ok "Reply mode: $REPLY_MODE"
 
-# ─── Step 5: Email filter mode ────────────────────────────────────────────────
-print_header "Step 5 of 8: Which Emails Should the Agent Respond To?"
+# ─── Step 6: Email filter mode ────────────────────────────────────────────────
+print_header "Step 6 of 9: Which Emails Should the Agent Respond To?"
 echo ""
 echo "  ${BOLD}Option 1 — Specific people only (whitelist)${RESET}"
 echo "    Only reply to emails from people you list."
 echo "    ${GREEN}Most safe. Best for auto-send or cautious start.${RESET}"
-echo "    Example: only respond to your team, or only to clients."
 echo ""
 echo "  ${BOLD}Option 2 — Everyone except blocked senders (blocklist)${RESET}"
 echo "    Reply to all emails EXCEPT newsletters, spam, and auto-generated messages."
@@ -168,7 +373,8 @@ case "$filter_choice" in
     echo ""
     echo "  ${BOLD}Enter the email addresses you want the agent to respond to.${RESET}"
     echo "  Separate multiple addresses with commas."
-    echo "  Example: alice@company.com, bob@company.com"
+    echo "  You can use partial matches: @company.com matches everyone at that domain."
+    echo "  Example: alice@company.com, bob@company.com, @trustedcorp.com"
     echo ""
     read -rp "  Allowed email addresses: " whitelist_input
     while [ -z "$whitelist_input" ]; do
@@ -176,7 +382,7 @@ case "$filter_choice" in
       read -rp "  Allowed email addresses: " whitelist_input
     done
     ONLY_REPLY_TO="$whitelist_input"
-    print_ok "Whitelist set: $ONLY_REPLY_TO"
+    print_ok "Whitelist set."
     ;;
   3)
     EMAIL_FILTER_MODE="all"
@@ -186,8 +392,7 @@ case "$filter_choice" in
   *)
     EMAIL_FILTER_MODE="blocklist"
     echo ""
-    echo "  ${BOLD}Default spam/newsletter senders are already blocked:${RESET}"
-    echo "  noreply@, no-reply@, mailer-daemon@, postmaster@, donotreply@"
+    echo "  Default blocked patterns: noreply@, no-reply@, mailer-daemon@, postmaster@, donotreply@"
     echo ""
     read -rp "  Add more blocked patterns? (comma-separated, or press ENTER to skip): " extra_ignore
     if [ -n "$extra_ignore" ]; then
@@ -197,19 +402,18 @@ case "$filter_choice" in
     ;;
 esac
 
-# ─── Step 6: Anthropic API Key ────────────────────────────────────────────────
-print_header "Step 6 of 8: Anthropic API Key (Claude AI)"
+# ─── Step 7: Anthropic API Key ────────────────────────────────────────────────
+print_header "Step 7 of 9: Anthropic API Key (Claude AI)"
 echo ""
-echo "  The agent uses Claude AI (made by Anthropic) to write email replies."
-echo "  You need an API key from Anthropic. Here is how to get one:"
+echo "  The agent uses Claude AI to write email replies."
+echo "  You need an API key from Anthropic:"
 echo ""
 echo "  ${BOLD}1.${RESET} Go to: ${CYAN}https://console.anthropic.com${RESET}"
 echo "  ${BOLD}2.${RESET} Sign up or log in"
-echo "  ${BOLD}3.${RESET} Click "API Keys" in the left sidebar"
-echo "  ${BOLD}4.${RESET} Click "Create Key", give it a name, copy the key"
-echo "  ${BOLD}5.${RESET} It starts with: sk-ant-..."
+echo "  ${BOLD}3.${RESET} Click "API Keys" in the left sidebar > "Create Key""
+echo "  ${BOLD}4.${RESET} Copy the key — it starts with: sk-ant-..."
 echo ""
-echo "  ${YELLOW}Cost: roughly $4-5 per month at 100 emails/day (very affordable)${RESET}"
+echo "  ${YELLOW}Cost: roughly $4-5 per month at 100 emails/day${RESET}"
 echo ""
 read -rp "  Paste your Anthropic API key here: " api_key
 while [ -z "$api_key" ]; do
@@ -226,64 +430,60 @@ if [[ "$api_key" != sk-ant-* ]]; then
 fi
 print_ok "API key saved."
 
-# ─── Step 7: Google OAuth Setup ───────────────────────────────────────────────
-print_header "Step 7 of 8: Google Gmail Access"
-echo ""
-echo "  The agent needs permission to read and reply to your Gmail."
-echo "  Google uses a secure system called OAuth — your password is NEVER shared."
-echo ""
-echo "  ${BOLD}You need to create a "credentials.json" file. Here is exactly how:${RESET}"
-echo ""
-echo "  ${BOLD}1.${RESET} Go to: ${CYAN}https://console.cloud.google.com${RESET}"
-echo "     (Sign in with the Google account whose Gmail you want to use)"
-echo ""
-echo "  ${BOLD}2.${RESET} Create a new project:"
-echo "     - Click the project dropdown at the top left"
-echo "     - Click "New Project""
-echo "     - Name it anything (e.g. "email-agent") and click "Create""
-echo ""
-echo "  ${BOLD}3.${RESET} Enable Gmail API:"
-echo "     - In the search bar, type "Gmail API""
-echo "     - Click on "Gmail API" in the results"
-echo "     - Click the blue "Enable" button"
-echo ""
-echo "  ${BOLD}4.${RESET} Create OAuth credentials:"
-echo "     - In the left menu, go to: APIs & Services > Credentials"
-echo "     - Click "+ Create Credentials" > "OAuth client ID""
-echo "     - If prompted, click "Configure Consent Screen" first:"
-echo "       * Choose "External", click Create"
-echo "       * Fill in App name (e.g. "My Email Agent")"
-echo "       * Fill in your email for support and developer contact"
-echo "       * Click Save and Continue through the rest (defaults are fine)"
-echo "       * On the "Test users" page, add your own Gmail address"
-echo "       * Click Save and Continue, then Back to Dashboard"
-echo "     - Back in Credentials, click "+ Create Credentials" > "OAuth client ID""
-echo "     - Application type: choose "Desktop app""
-echo "     - Name it anything, click "Create""
-echo "     - Click the download icon (⬇) to download the JSON file"
-echo ""
-echo "  ${BOLD}5.${RESET} Move the downloaded file:"
-echo "     - Rename it to: credentials.json"
-echo "     - Move it into this folder: $(pwd)"
-echo ""
-echo "${YELLOW}  ─────────────────────────────────────────────────────────────${RESET}"
-read -rp "  Press ENTER when you have placed credentials.json in this folder..." _unused
-echo ""
-if [ ! -f "credentials.json" ]; then
-  print_warn "credentials.json not found in $(pwd)"
-  echo "  You can re-run setup.sh later once you have it."
-  echo "  The .env file has already been saved with your other settings."
-  MISSING_CREDS=true
+# ─── Step 8: Provider-specific credentials (Gmail only at this step) ──────────
+if [ "$EMAIL_PROVIDER" = "gmail" ]; then
+  print_header "Step 8 of 9: Google Gmail Access (OAuth)"
+  echo ""
+  echo "  Gmail uses a secure system called OAuth — your password is NEVER shared."
+  echo "  You will create a credentials.json file from Google Cloud Console."
+  echo ""
+  echo "  ${BOLD}1.${RESET} Go to: ${CYAN}https://console.cloud.google.com${RESET}"
+  echo "     Sign in with the Google account whose Gmail you want to use."
+  echo ""
+  echo "  ${BOLD}2.${RESET} Create a new project:"
+  echo "     - Click the project dropdown (top left) > New Project"
+  echo "     - Name it anything (e.g. "email-agent") and click Create"
+  echo ""
+  echo "  ${BOLD}3.${RESET} Enable Gmail API:"
+  echo "     - In the search bar, type "Gmail API" and select it"
+  echo "     - Click the blue Enable button"
+  echo ""
+  echo "  ${BOLD}4.${RESET} Create OAuth credentials:"
+  echo "     - Go to: APIs & Services > Credentials"
+  echo "     - Click + Create Credentials > OAuth client ID"
+  echo "     - If prompted to configure the consent screen first:"
+  echo "       * Choose External, fill in your app name and email, click Save"
+  echo "       * Under Test users, add your own Gmail address"
+  echo "       * Click Back to Dashboard"
+  echo "     - Back in Credentials: + Create Credentials > OAuth client ID"
+  echo "     - Application type: Desktop app"
+  echo "     - Click Create, then the download icon (⬇) to get the JSON file"
+  echo ""
+  echo "  ${BOLD}5.${RESET} Place the file:"
+  echo "     - Rename the downloaded file to: credentials.json"
+  echo "     - Move it into this folder: $(pwd)"
+  echo ""
+  read -rp "  Press ENTER when credentials.json is in this folder..." _unused
+  echo ""
+  if [ ! -f "credentials.json" ]; then
+    print_warn "credentials.json not found. You can place it here later and re-run:"
+    echo "    python3 -c "from gmail_client import get_gmail_service; get_gmail_service()""
+    MISSING_CREDS=true
+  else
+    print_ok "credentials.json found!"
+    MISSING_CREDS=false
+  fi
 else
-  print_ok "credentials.json found!"
-  MISSING_CREDS=false
+  print_header "Step 8 of 9: Credentials Review"
+  echo ""
+  print_ok "Credentials already collected in Step 3. Nothing more needed here."
 fi
 
-# ─── Step 8: Poll interval ────────────────────────────────────────────────────
-print_header "Step 8 of 8: How Often to Check Email"
+# ─── Step 9: Poll interval ────────────────────────────────────────────────────
+print_header "Step 9 of 9: How Often to Check Email"
 echo ""
 echo "  How often should the agent check for new emails?"
-echo "  60 seconds is a good balance. You can always change this later in .env"
+echo "  60 seconds is a good default."
 echo ""
 read -rp "  Check every how many seconds? [default: 60]: " poll_interval
 POLL_INTERVAL_SECONDS="${poll_interval:-60}"
@@ -295,39 +495,54 @@ echo "  Saving your settings to .env..."
 
 cat > .env <<ENVEOF
 # Claude Email Agent Configuration
-# Generated by setup.sh -- edit any value here and restart the agent
+# Generated by setup.sh — edit any value here and restart the agent
 
-# ── Anthropic (Claude AI) ──────────────────────────────────────
+# ── Email Provider ────────────────────────────────────────────
+# gmail | outlook | yahoo | icloud | imap
+EMAIL_PROVIDER=${EMAIL_PROVIDER}
+
+# ── Anthropic (Claude AI) ─────────────────────────────────────
 ANTHROPIC_API_KEY=${api_key}
 
-# ── Deployment ────────────────────────────────────────────────
+# ── Deployment ───────────────────────────────────────────────
 DEPLOY_MODE=${DEPLOY_MODE}
 
-# ── Reply mode: draft = save to Drafts, send = auto-send ──────
+# ── Reply mode ───────────────────────────────────────────────
 REPLY_MODE=${REPLY_MODE}
 
-# ── Polling interval (seconds) ────────────────────────────────
+# ── Polling interval (seconds) ───────────────────────────────
 POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS}
 
 # ── Email filter mode ─────────────────────────────────────────
-# whitelist = ONLY reply to emails listed in ONLY_REPLY_TO
-# blocklist = reply to all EXCEPT patterns in IGNORE_SENDERS
-# all       = reply to everything (not recommended)
 EMAIL_FILTER_MODE=${EMAIL_FILTER_MODE}
 
-# ── Whitelist: only reply to these senders (used when EMAIL_FILTER_MODE=whitelist)
-# Comma-separated. Can be full email or partial match (e.g. @mycompany.com)
+# ── Whitelist (EMAIL_FILTER_MODE=whitelist) ───────────────────
 ONLY_REPLY_TO=${ONLY_REPLY_TO}
 
-# ── Blocklist: never reply to these patterns (used when EMAIL_FILTER_MODE=blocklist or all)
+# ── Blocklist (EMAIL_FILTER_MODE=blocklist or all) ────────────
 IGNORE_SENDERS=${IGNORE_SENDERS}
 
-# ── Gmail label applied to processed emails ────────────────────
+# ── Gmail label applied to processed emails ───────────────────
 LABEL_AFTER_REPLY=AI-Replied
 
-# ── Claude model (do not change unless you know why) ──────────
+# ── Claude model ─────────────────────────────────────────────
 MODEL=claude-haiku-4-5
 MAX_TOKENS=1024
+
+# ── Outlook / Microsoft 365 credentials ──────────────────────
+# (Only used when EMAIL_PROVIDER=outlook)
+OUTLOOK_CLIENT_ID=${OUTLOOK_CLIENT_ID}
+OUTLOOK_CLIENT_SECRET=${OUTLOOK_CLIENT_SECRET}
+OUTLOOK_TENANT_ID=${OUTLOOK_TENANT_ID}
+
+# ── IMAP/SMTP credentials ─────────────────────────────────────
+# (Used for yahoo, icloud, imap providers)
+EMAIL_ADDRESS=${EMAIL_ADDRESS}
+EMAIL_APP_PASSWORD=${EMAIL_APP_PASSWORD}
+IMAP_HOST=${IMAP_HOST}
+IMAP_PORT=${IMAP_PORT}
+SMTP_HOST=${SMTP_HOST}
+SMTP_PORT=${SMTP_PORT}
 ENVEOF
 print_ok ".env saved."
 
@@ -338,18 +553,14 @@ $PYTHON -m pip install --quiet --upgrade pip
 $PYTHON -m pip install --quiet -r requirements.txt
 print_ok "Packages installed."
 
-# ─── First-run auth (if credentials.json exists) ──────────────────────────────
-if [ "$MISSING_CREDS" = "false" ]; then
+# ─── First-run Gmail auth (if credentials.json exists) ───────────────────────
+if [ "$EMAIL_PROVIDER" = "gmail" ] && [ "$MISSING_CREDS" = "false" ]; then
   echo ""
-  echo "  ${BOLD}Almost done! Let's connect to your Gmail account.${RESET}"
+  echo "  ${BOLD}Connecting to your Gmail account...${RESET}"
+  echo "  A browser window will open. Sign in to Google and click Allow."
+  echo "  You may see a warning — click Advanced > Go to [app name] to continue."
   echo ""
-  echo "  A browser window will open asking you to sign in to Google."
-  echo "  Sign in with the Gmail account you want the agent to manage."
-  echo "  You may see a warning that says "This app is not verified" --"
-  echo "  click "Advanced" then "Go to [your app name] (unsafe)" to continue."
-  echo "  (This is normal for personal apps you create yourself.)"
-  echo ""
-  read -rp "  Press ENTER to open the browser and authorize Gmail access..." _unused
+  read -rp "  Press ENTER to open the browser..." _unused
   $PYTHON -c "from gmail_client import get_gmail_service; get_gmail_service()" && print_ok "Gmail connected!"
 fi
 
@@ -360,39 +571,29 @@ echo "  ╔═══════════════════════
 echo "  ║                    Setup Complete!                       ║"
 echo "  ╚══════════════════════════════════════════════════════════╝"
 echo "${RESET}"
-
 echo "  ${BOLD}Your settings:${RESET}"
-echo "    Reply mode:  ${BOLD}$REPLY_MODE${RESET}"
-echo "    Filter mode: ${BOLD}$EMAIL_FILTER_MODE${RESET}"
-if [ -n "$ONLY_REPLY_TO" ]; then
-echo "    Whitelist:   ${BOLD}$ONLY_REPLY_TO${RESET}"
-fi
-echo "    Check every: ${BOLD}${POLL_INTERVAL_SECONDS}s${RESET}"
+echo "    Email provider: ${BOLD}$EMAIL_PROVIDER${RESET}"
+echo "    Reply mode:     ${BOLD}$REPLY_MODE${RESET}"
+echo "    Filter mode:    ${BOLD}$EMAIL_FILTER_MODE${RESET}"
+[ -n "$ONLY_REPLY_TO" ] && echo "    Whitelist:      ${BOLD}$ONLY_REPLY_TO${RESET}"
+echo "    Check every:    ${BOLD}${POLL_INTERVAL_SECONDS}s${RESET}"
 echo ""
-
-echo "  ${BOLD}One more thing: customize your agent persona${RESET}"
-echo "  Open ${CYAN}config.py${RESET} and fill in the SYSTEM_PROMPT section with:"
-echo "    - Your name"
-echo "    - What your inbox is for (customer support, scheduling, etc.)"
-echo "    - Any FAQs, policies, or business context"
+echo "  ${BOLD}Next: customize your agent persona${RESET}"
+echo "  Open ${CYAN}config.py${RESET} and update the SYSTEM_PROMPT with your name,"
+echo "  what your inbox is for, and any FAQs or policies."
 echo "  The more detail you add, the better the replies will be."
 echo ""
-
-if [ "$MISSING_CREDS" = "true" ]; then
+if [ "$EMAIL_PROVIDER" = "gmail" ] && [ "$MISSING_CREDS" = "true" ]; then
   echo "  ${YELLOW}⚠  Still needed: credentials.json from Google Cloud Console${RESET}"
-  echo "  Once you have it, place it in this folder and run:"
-  echo "    ${BOLD}python3 -c "from gmail_client import get_gmail_service; get_gmail_service()"${RESET}"
+  echo "  Once you have it, place it here and run:"
+  echo "    python3 -c "from gmail_client import get_gmail_service; get_gmail_service()""
   echo ""
 fi
-
 echo "  ${BOLD}To start the agent:${RESET}"
 if [ "$DEPLOY_MODE" = "local" ]; then
   echo "    ${BOLD}python3 agent.py${RESET}"
-  echo ""
-  echo "  The agent will run while this terminal is open."
   echo "  Press Ctrl+C to stop it."
 else
   echo "  See the README for server deployment instructions."
 fi
 echo ""
-
