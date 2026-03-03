@@ -1,172 +1,299 @@
 # Claude Email Agent
 
-> A smart, self-improving email auto-reply agent powered by Claude AI and the Gmail API — with built-in agent-onboarding infrastructure for context-aware, continuously improving replies.
+**An AI assistant that reads your Gmail and drafts (or sends) replies for you — powered by Claude AI.**
+
+No coding knowledge required to get started. The setup wizard guides you through everything.
 
 ---
 
-## What This Is
+## What Does This Do?
 
-This repo is a **ready-to-initialize template** for building a Claude-powered email agent. Once set up, it:
+Once set up, this agent:
 
-- Monitors your Gmail inbox for new emails
-- Uses Claude (with prompt caching) to draft contextual, persona-aware replies
-- Saves replies as **drafts** (default) or **auto-sends** them (opt-in)
-- Runs **locally** or on a **server** (systemd service or Docker)
-- Includes full **agent-onboarding** infrastructure so the agent understands your inbox, persona, and goals — and improves over time
+1. Watches your Gmail inbox for new emails
+2. Reads each email and generates a contextual, on-brand reply using Claude AI
+3. Either **saves the reply as a Gmail draft** (so you can review before sending) or **sends it automatically** (once you trust it)
+4. Labels processed emails in Gmail so you can track what it handled
+5. Continuously improves over time as you give it more context
 
 ---
 
-## Quick Start
+## Before You Start — What You'll Need
 
-### 1. Clone this repo
+You need three things. None of them cost much:
 
+| What | Where to get it | Cost |
+|---|---|---|
+| A **Google Cloud account** | [console.cloud.google.com](https://console.cloud.google.com) | Free |
+| An **Anthropic API key** | [console.anthropic.com](https://console.anthropic.com) | ~$4-5/month at typical usage |
+| **Python 3** installed | [python.org/downloads](https://www.python.org/downloads/) | Free |
+
+The setup wizard will walk you through all three step by step.
+
+---
+
+## Quickstart (5 Steps)
+
+### Step 1 — Get the code
+
+**Option A: Clone with Git**
 ```bash
 git clone https://github.com/YOUR_USERNAME/claude-email-agent.git
 cd claude-email-agent
 ```
 
-### 2. Run the initializer
+**Option B: Download ZIP**
+- Click the green **Code** button on this page → **Download ZIP**
+- Unzip it somewhere on your computer
+- Open a terminal and `cd` into the folder
+
+### Step 2 — Run the setup wizard
 
 ```bash
 bash setup.sh
 ```
 
-This will:
-- Ask whether you want to run **locally** or on a **server**
-- Ask whether the agent should **draft** replies or **auto-send** them
-- Install Python dependencies
-- Guide you through Google OAuth setup
-- Write your choices to `.env`
+The wizard will ask you 8 simple questions and handle everything else. It takes about 10-15 minutes.
 
-### 3. Add your credentials
+> **On Windows?** Use [Git Bash](https://gitforwindows.org/) or [WSL](https://docs.microsoft.com/en-us/windows/wsl/install) to run bash scripts.
 
-- Place your `credentials.json` (Google OAuth2) in the project root
-- Add your `ANTHROPIC_API_KEY` to `.env`
+### Step 3 — Customize your agent persona
 
-### 4. Customize your agent persona
+Open `config.py` in any text editor and fill in the `SYSTEM_PROMPT` section.
 
-Edit `config.py` — specifically the `SYSTEM_PROMPT` block. The more context you give it (your name, role, business, FAQs, policies), the better the replies.
+This is like writing a briefing for a human assistant — the more detail you give, the better the replies:
 
-### 5. Start the agent
+```
+SYSTEM_PROMPT = """
+You are an email assistant for Sarah Chen at Bloom Consulting.
 
-**Local (foreground):**
-```bash
-python agent.py
+## Your Tone and Style
+- Warm and professional
+- Keep replies under 100 words when possible
+- Always sign off: "Best, Sarah"
+
+## Your Role
+This inbox handles scheduling requests and project inquiries
+for a small consulting firm.
+
+## Business Hours
+Monday through Friday, 9am to 6pm Pacific Time.
+We typically respond within one business day.
+
+## Common Questions
+Q: What are your rates?
+A: Our rates start at $150/hour. Happy to send a full proposal.
+
+Q: Are you taking new clients?
+A: Yes! We have capacity for 2-3 new projects starting next quarter.
+"""
 ```
 
-**Local (background):**
+### Step 4 — Start the agent
+
 ```bash
-nohup python agent.py &
+python3 agent.py
 ```
 
-**Server (systemd service):**
-```bash
-sudo cp deploy/claude-email-agent.service /etc/systemd/system/
-sudo systemctl enable claude-email-agent
-sudo systemctl start claude-email-agent
+You'll see it start up and begin watching your inbox. Press `Ctrl+C` to stop it.
+
+### Step 5 — Review the drafts
+
+Check your **Gmail Drafts folder**. You'll see Claude's replies waiting for you. Read a few, edit if needed, send the ones you like.
+
+Once you're comfortable with the quality after a few days, you can switch to auto-send by changing `REPLY_MODE=send` in your `.env` file.
+
+---
+
+## Controlling Which Emails Get a Reply
+
+This is one of the most important settings. You have three options:
+
+### Option 1: Whitelist — Only reply to specific people ✅ Recommended
+
+The agent **only responds to emails from addresses you list**. Everyone else is ignored.
+
+Best for:
+- Starting out (safest option)
+- Using auto-send mode
+- Responding only to your team, clients, or known contacts
+
+Set in your `.env` file:
+```
+EMAIL_FILTER_MODE=whitelist
+ONLY_REPLY_TO=alice@company.com, bob@company.com, @trustedcorp.com
 ```
 
-**Docker:**
-```bash
-docker build -t claude-email-agent .
-docker run -d --env-file .env -v $(pwd)/credentials.json:/app/credentials.json -v $(pwd)/token.json:/app/token.json claude-email-agent
+> You can use partial matches like `@trustedcorp.com` to whitelist an entire domain.
+
+### Option 2: Blocklist — Reply to everyone except spam/newsletters
+
+The agent replies to **all emails except** the ones you've blocked.
+
+Best for:
+- Customer support inboxes
+- Public-facing email addresses
+- When you want broad coverage
+
+Set in your `.env` file:
+```
+EMAIL_FILTER_MODE=blocklist
+IGNORE_SENDERS=noreply@,no-reply@,newsletter@,unsubscribe@
+```
+
+> The agent always blocks obvious auto-senders (mailer-daemon, postmaster, etc.) regardless of mode.
+
+### Option 3: All emails — No filter
+
+Replies to everything. **Not recommended** unless you know exactly what you're doing.
+
+```
+EMAIL_FILTER_MODE=all
 ```
 
 ---
 
-## Agent Onboarding
+## Draft Mode vs. Auto-Send
 
-This repo includes the [agent-onboarding](https://github.com/namelesstherebel/agent-onboarding) infrastructure. If you use **Claude Code**, run the full onboarding workflow to deeply configure your agent:
+| | Draft Mode | Auto-Send |
+|---|---|---|
+| What happens | Claude writes the reply, saves it to Drafts | Claude writes AND sends the reply |
+| You review? | Yes — you decide whether to send | No — it goes out automatically |
+| Recommended for | Starting out, any inbox | Only after reviewing drafts for days/weeks |
+| How to set | `REPLY_MODE=draft` (default) | `REPLY_MODE=send` |
+
+**Always start in draft mode.** Switch to auto-send only after you've reviewed at least a week of draft replies and are happy with the quality.
+
+---
+
+## Running It in the Background
+
+### On your computer (keep it running after closing terminal)
+```bash
+nohup python3 agent.py > agent.log 2>&1 &
+```
+To stop it: `pkill -f agent.py`
+
+### On a Linux server (runs 24/7, restarts automatically)
+
+1. Edit the paths in `deploy/claude-email-agent.service`
+2. Install it:
+```bash
+sudo cp deploy/claude-email-agent.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable claude-email-agent
+sudo systemctl start claude-email-agent
+```
+3. Check it's running: `sudo systemctl status claude-email-agent`
+4. View logs: `sudo journalctl -u claude-email-agent -f`
+
+### With Docker
+```bash
+docker build -t claude-email-agent .
+docker run -d \
+  --env-file .env \
+  -v $(pwd)/credentials.json:/app/credentials.json \
+  -v $(pwd)/token.json:/app/token.json \
+  claude-email-agent
+```
+
+---
+
+## Improving Your Agent Over Time
+
+This repo includes [agent-onboarding](https://github.com/namelesstherebel/agent-onboarding) infrastructure. If you use **Claude Code**, you can run a guided 7-phase setup that deeply configures your agent:
 
 ```
 *onboard
 ```
 
-This walks you through 7 phases and produces `CLAUDE.md`, `INTENT.md`, `PROJECT_BRIEF.md`, `SPEC_INVENTORY.md`, and a full `SPECS/` directory — giving your agent rich context about your inbox and persona.
+After any task, the agent surfaces suggestions for improvement:
 
-After any task, the runtime surfaces improvement proposals:
 ```
 *review
 ```
 
-See [CLAUDE.md](./CLAUDE.md) for agent commands and full context.
-
 ---
 
-## Configuration Options
+## All Settings Reference
 
-All settings live in `.env` and `config.py`.
+Edit these in your `.env` file (created by setup.sh):
 
-| Setting | Options | Default |
+| Setting | What it does | Default |
 |---|---|---|
-| `REPLY_MODE` | `draft` / `send` | `draft` |
-| `DEPLOY_MODE` | `local` / `server` | `local` |
-| `POLL_INTERVAL_SECONDS` | Any integer | `60` |
-| `ONLY_REPLY_TO` | Comma-separated emails | (all) |
-| `IGNORE_SENDERS` | Comma-separated patterns | `noreply@,no-reply@` |
-| `LABEL_AFTER_REPLY` | Any Gmail label name | `AI-Replied` |
-| `MODEL` | Claude model name | `claude-haiku-4-5` |
-
----
-
-## Repo Structure
-
-```
-claude-email-agent/
-├── agent.py                         # Main polling loop
-├── gmail_client.py                  # Gmail API auth + read/send/draft helpers
-├── claude_agent.py                  # Claude API calls + prompt caching
-├── config.py                        # System prompt, filters, settings
-├── setup.sh                         # Interactive initializer
-├── requirements.txt
-├── .env.example
-├── .gitignore
-├── deploy/
-│   ├── claude-email-agent.service   # systemd unit file
-│   └── Dockerfile
-├── CLAUDE.md                        # Agent context loaded by Claude Code
-├── INTENT.md                        # Agent intent and trade-off rules
-├── PROJECT_BRIEF.md                 # Project overview
-├── SPEC_INVENTORY.md                # Task inventory and spec queue
-├── RUNTIME.md                       # Self-improving runtime
-├── IMPROVEMENT_QUEUE.md             # Proposal queue
-├── ONBOARDING_STATE.md              # Onboarding progress tracker
-├── CONTEXT/
-│   └── email-agent-research.md     # Full research doc and cost breakdown
-└── SPECS/
-    ├── SPEC-001-gmail-polling.md
-    ├── SPEC-002-claude-reply.md
-    └── SPEC-003-send-or-draft.md
-```
+| `ANTHROPIC_API_KEY` | Your Claude AI key | (required) |
+| `REPLY_MODE` | `draft` or `send` | `draft` |
+| `EMAIL_FILTER_MODE` | `whitelist`, `blocklist`, or `all` | `whitelist` |
+| `ONLY_REPLY_TO` | Emails to respond to (whitelist mode) | (empty) |
+| `IGNORE_SENDERS` | Patterns to never reply to | spam/auto-senders |
+| `POLL_INTERVAL_SECONDS` | How often to check Gmail | `60` |
+| `LABEL_AFTER_REPLY` | Gmail label to tag processed emails | `AI-Replied` |
+| `MODEL` | Claude model | `claude-haiku-4-5` |
+| `DEPLOY_MODE` | `local` or `server` | `local` |
 
 ---
 
 ## Safety Checklist
 
-- Start in **draft mode** — review replies for a few days before enabling auto-send
-- Use a **test Gmail account** first, not your main inbox
-- **Never commit** `credentials.json` or `token.json` — they are in `.gitignore`
-- Store all API keys in `.env`, never hardcoded
-- Sender whitelisting (`ONLY_REPLY_TO`) is strongly recommended for auto-send
-- Skip newsletters by checking for `List-Unsubscribe` headers
-- Verify prompt caching is active via `usage.cache_read_input_tokens` on the second call
+Before going live, make sure you can check all of these:
+
+- [ ] I started in **draft mode** and reviewed replies for several days
+- [ ] I'm using a **test Gmail account** first (not my main inbox)
+- [ ] I set up a **whitelist** or at minimum a blocklist
+- [ ] My **credentials.json** and **token.json** are in .gitignore (never committed)
+- [ ] My **API key** is in .env, not hardcoded in any file
+- [ ] I've customized the **SYSTEM_PROMPT** in config.py with real context
+- [ ] If using auto-send, I have a **whitelist** set
 
 ---
 
 ## Cost
 
-Using `claude-haiku-4-5` with prompt caching at 100 emails/day: **~$4-5/month**.
+At 100 emails per day using `claude-haiku-4-5` with prompt caching: **under $5/month**.
 
-See [CONTEXT/email-agent-research.md](./CONTEXT/email-agent-research.md) for the full cost breakdown and model comparison.
+This is because the agent uses a technique called **prompt caching** — your system prompt (the briefing you write) is cached by Anthropic and reused at 10% of the normal cost for every email after the first.
+
+The longer and more detailed your system prompt, the bigger the savings. A thorough 2,000-word briefing costs almost the same as a short one.
 
 ---
 
-## Requirements
+## Troubleshooting
 
-- Python 3.9+
-- Google Cloud project with Gmail API enabled
-- Anthropic API key ([get one here](https://console.anthropic.com))
-- Gmail account
+**"No module named X"** — Run `pip3 install -r requirements.txt`
+
+**"credentials.json not found"** — Make sure you downloaded and placed it in the project folder (see setup.sh Step 7)
+
+**"Token has been expired"** — Delete `token.json` and run the agent again. It will re-open the browser to re-authorize.
+
+**"Access blocked: app not verified"** — In Google Cloud Console, add your Gmail address as a test user under APIs & Services > OAuth consent screen > Test users.
+
+**Agent not responding to emails** — Check `agent.log` for errors. Also confirm your `EMAIL_FILTER_MODE` and `ONLY_REPLY_TO` settings — the email may be getting filtered.
+
+**Replies sound generic** — Add more detail to `SYSTEM_PROMPT` in `config.py`. Include FAQs, example replies, and specific business context.
+
+---
+
+## File Structure
+
+```
+claude-email-agent/
+├── agent.py             # Main loop — run this to start the agent
+├── gmail_client.py      # Gmail API helpers
+├── claude_agent.py      # Claude AI reply generation
+├── config.py            # ⭐ Main config — customize SYSTEM_PROMPT here
+├── setup.sh             # Setup wizard — run this first
+├── requirements.txt     # Python packages
+├── .env.example         # Settings template (copy to .env)
+├── .gitignore           # Keeps secrets out of git
+├── deploy/
+│   ├── Dockerfile                    # Docker deployment
+│   └── claude-email-agent.service    # Linux systemd service
+├── CLAUDE.md            # Agent context for Claude Code users
+├── INTENT.md            # Agent trade-off rules
+├── SPECS/               # Technical specs for each feature
+└── CONTEXT/
+    └── email-agent-research.md  # Architecture and cost details
+```
 
 ---
 
