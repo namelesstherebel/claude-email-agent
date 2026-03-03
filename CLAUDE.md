@@ -1,81 +1,108 @@
-# CLAUDE.md — Agent Context
+# CLAUDE.md -- Claude Email Agent
 
-> This file is automatically loaded by Claude Code.
-> It provides the agent with full context about this project.
-
----
-
-## Project
-
-**claude-email-agent** — A self-improving Gmail auto-reply agent powered by Claude AI.
-
-This is a template repo. When initialized, it creates a working email agent that:
-- Polls Gmail for unread emails
-- Generates contextual replies via Claude (with prompt caching)
-- Saves as drafts or auto-sends based on configuration
-- Filters emails by whitelist, blocklist, or allows all
-- Runs locally or on a server
+This file gives Claude AI context about this project whenever it is opened in an AI-assisted editor.
 
 ---
 
-## Star Commands
+## Project Purpose
 
-| Command | What it does |
-|---|---|
-| `*onboard` | Run the full 7-phase onboarding to configure your email agent persona |
-| `*review` | Surface pending improvement proposals for approval/rejection |
-| `*reflect` | Manually trigger a friction review and generate improvement proposals |
-| `*status` | Report environment health: spec coverage, open proposals, last activity |
+This is a template repository for setting up a personal email auto-reply agent powered by Claude AI.
+Users clone this repo, run the setup wizard, and get a working AI email agent in minutes.
+It supports multiple email providers and deploys locally or on a server.
 
 ---
 
-## Key Files
+## Architecture
 
-| File | Purpose |
-|---|---|
-| `config.py` | **Primary customization point** — SYSTEM_PROMPT, filter mode, reply mode |
-| `agent.py` | Main polling loop + safety pre-flight check |
-| `gmail_client.py` | Gmail API auth + read/send/draft helpers |
-| `claude_agent.py` | Claude API call with prompt caching |
-| `setup.sh` | Interactive setup wizard (non-technical friendly) |
-| `.env` | All runtime configuration (never committed) |
+Three-layer design:
+
+1. **Email Client Layer** (email_client.py) -- reads and sends emails
+   - GmailClient: Gmail via Google OAuth2 + Gmail API
+   - OutlookClient: Outlook / Microsoft 365 via Microsoft Graph API (MSAL)
+   - IMAPClient: Any provider via imaplib/smtplib (Yahoo, iCloud, custom)
+   - All three expose identical interface: get_unread(), send_reply(), create_draft(), mark_read()
+
+2. **Claude Brain** (claude_agent.py) -- generates replies using Anthropic API
+   - Uses prompt caching (cache_control ephemeral) on system prompt
+   - Model: claude-haiku-4-5 for speed and cost efficiency
+
+3. **Agent Loop** (agent.py) -- orchestrates polling, filtering, and actions
+   - Runs pre-flight safety check before any operations
+   - Respects EMAIL_FILTER_MODE (whitelist / blocklist / all)
+   - Respects REPLY_MODE (draft / send)
 
 ---
 
-## Email Filter Mode (Key Concept)
+## Supported Email Providers
 
-The `EMAIL_FILTER_MODE` setting controls which emails get a reply:
-
-| Mode | Behavior | Use When |
+| Provider | Client Class | Auth |
 |---|---|---|
-| `whitelist` | Only reply to senders in `ONLY_REPLY_TO` | Starting out, or auto-send mode |
-| `blocklist` | Reply to all except patterns in `IGNORE_SENDERS` | Public/support inbox |
-| `all` | Reply to everything | Rarely — requires high confidence |
+| Gmail | GmailClient | Google OAuth2 (credentials.json + token.json) |
+| Outlook / Microsoft 365 | OutlookClient | Azure MSAL (client_id, client_secret, tenant_id) |
+| Yahoo Mail | IMAPClient | App password + IMAP |
+| iCloud Mail | IMAPClient | App-specific password + IMAP |
+| Any IMAP provider | IMAPClient | App password + IMAP |
 
-The pre-flight safety check in `agent.py` blocks unsafe combinations (e.g. auto-send + all mode).
-
----
-
-## Configuration Priority
-
-1. **System prompt** in `config.py` — defines the agent's persona and reply rules
-2. **`.env` variables** — deployment mode, reply mode, filter mode
-3. **Agent-onboarding docs** — `INTENT.md`, `SPECS/` — define long-term behavior
+Provider is selected during setup.sh and stored as EMAIL_PROVIDER in .env.
+agent.py uses build_email_client() to instantiate the correct client.
 
 ---
 
-## Critical Rules for Working in This Repo
+## Key Settings (all in .env)
 
-- `credentials.json` and `token.json` must NEVER be committed
-- API keys must NEVER be hardcoded — always use `.env`
-- Always test changes in draft mode before enabling auto-send
-- Do NOT set `EMAIL_FILTER_MODE=all` with `REPLY_MODE=send` (blocked by pre-flight check)
-- The system prompt must be at least 1,024 tokens for prompt caching to activate
-- When modifying `config.py`, run `verify_caching()` from `claude_agent.py` to confirm caching still works
+| Variable | Values | Notes |
+|---|---|---|
+| EMAIL_PROVIDER | gmail / outlook / yahoo / icloud / imap | Set by setup.sh |
+| REPLY_MODE | draft / send | Default: draft |
+| EMAIL_FILTER_MODE | whitelist / blocklist / all | Default: whitelist |
+| ONLY_REPLY_TO | comma-separated emails | Used when whitelist mode |
+| IGNORE_SENDERS | comma-separated patterns | Used when blocklist mode |
+| ANTHROPIC_API_KEY | sk-ant-... | Required |
+| AGENT_PERSONA | free text | System prompt instructions |
+| OUTLOOK_CLIENT_ID | UUID | Outlook only |
+| OUTLOOK_CLIENT_SECRET | string | Outlook only |
+| OUTLOOK_TENANT_ID | UUID or consumers | Outlook only |
+| EMAIL_ADDRESS | email address | IMAP providers only |
+| EMAIL_APP_PASSWORD | string | IMAP providers only |
+| IMAP_HOST | hostname | IMAP providers only |
+| SMTP_HOST | hostname | IMAP providers only |
 
 ---
 
-## Runtime
+## Safety Rules
 
-After every task, the self-improving runtime will surface improvement proposals.
-Run `*review` to approve or reject them.
+NEVER do any of the following:
+- Commit .env, credentials.json, or token.json to git (gitignored)
+- Hardcode API keys, passwords, or secrets in any source file
+- Start the agent with REPLY_MODE=send and EMAIL_FILTER_MODE=all (blocked by preflight)
+- Start the agent with EMAIL_FILTER_MODE=whitelist and empty ONLY_REPLY_TO (blocked by preflight)
+- Break the existing Gmail flow -- GmailClient must preserve all existing behavior
+
+---
+
+## File Map
+
+- agent.py -- main loop, build_email_client() factory, preflight_safety_check()
+- email_client.py -- EmailClient base class + GmailClient, OutlookClient, IMAPClient
+- gmail_client.py -- Gmail OAuth2 helpers (imported by GmailClient)
+- claude_agent.py -- Anthropic SDK wrapper
+- config.py -- loads .env, filter logic
+- setup.sh -- interactive 9-step setup wizard
+- .env.example -- template with all variables documented
+- deploy/ -- Dockerfile + systemd service for server deployment
+- SPECS/ -- feature specifications (SPEC-001 through SPEC-005)
+
+---
+
+## Onboarding Infrastructure
+
+This repo was bootstrapped with the agent-onboarding framework:
+https://github.com/namelesstherebel/agent-onboarding
+
+Key docs produced by onboarding:
+- INTENT.md -- project goals and north star
+- PROJECT_BRIEF.md -- stakeholder-facing overview
+- SPEC_INVENTORY.md -- list of all specifications
+- RUNTIME.md -- how to run and deploy
+- IMPROVEMENT_QUEUE.md -- backlog of future improvements
+- ONBOARDING_STATE.md -- onboarding phase tracker
