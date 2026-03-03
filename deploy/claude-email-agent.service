@@ -1,0 +1,31 @@
+[Unit]
+Description=Claude Email Agent
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/path/to/claude-email-agent
+ExecStart=/usr/bin/python3 /path/to/claude-email-agent/agent.py
+Restart=on-failure
+RestartSec=30
+
+# Load environment variables from .env file
+EnvironmentFile=/path/to/claude-email-agent/.env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=claude-email-agent
+
+[Install]
+WantedBy=multi-user.target
+
+# ─── Usage ───────────────────────────────────────────────────────────────────
+# 1. Edit User and WorkingDirectory/ExecStart/EnvironmentFile paths above
+# 2. Copy to systemd: sudo cp deploy/claude-email-agent.service /etc/systemd/system/
+# 3. Reload daemon:   sudo systemctl daemon-reload
+# 4. Enable:          sudo systemctl enable claude-email-agent
+# 5. Start:           sudo systemctl start claude-email-agent
+# 6. Check status:    sudo systemctl status claude-email-agent
+# 7. View logs:       sudo journalctl -u claude-email-agent -f
