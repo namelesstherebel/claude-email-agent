@@ -546,12 +546,88 @@ SMTP_PORT=${SMTP_PORT}
 ENVEOF
 print_ok ".env saved."
 
-# ─── Install dependencies ─────────────────────────────────────────────────────
+# ─── Check and install dependencies ──────────────────────────────────────────
 echo ""
-echo "  Installing Python packages (this may take a minute)..."
-$PYTHON -m pip install --quiet --upgrade pip
-$PYTHON -m pip install --quiet -r requirements.txt
-print_ok "Packages installed."
+print_header "Checking Dependencies"
+echo ""
+
+# -- Check pip is available -----------------------------------------------
+if ! $PYTHON -m pip --version &>/dev/null; then
+  echo "  ${RED}pip is not available. Attempting to install...${RESET}"
+  $PYTHON -m ensurepip --upgrade 2>/dev/null || {
+    echo ""
+    echo "  ${RED}${BOLD}Could not install pip automatically.${RESET}"
+    echo "  Please install pip manually:"
+    echo "    Mac/Linux: python3 -m ensurepip --upgrade"
+    echo "    Or visit:  https://pip.pypa.io/en/stable/installation/"
+    echo ""
+    exit 1
+  }
+  print_ok "pip installed."
+else
+  PIP_VER=$($PYTHON -m pip --version 2>/dev/null | awk '{print $2}')
+  print_ok "pip found: $PIP_VER"
+fi
+
+# -- Upgrade pip quietly ---------------------------------------------------
+echo "  Upgrading pip to latest version..."
+$PYTHON -m pip install --quiet --upgrade pip && print_ok "pip up to date."
+echo ""
+
+# -- Check each package from requirements.txt ------------------------------
+if [ ! -f requirements.txt ]; then
+  echo "  ${YELLOW}Warning: requirements.txt not found. Skipping package check.${RESET}"
+else
+  echo "  Checking required packages..."
+  echo ""
+  MISSING_PKGS=()  # packages that need to be installed
+  PRESENT_PKGS=()  # packages already present
+
+  while IFS= read -r pkg || [ -n "$pkg" ]; do
+    # Skip blank lines and comments
+    [[ -z "$pkg" || "$pkg" == \#* ]] && continue
+    # Strip version specifiers to get bare package name for import check
+    pkg_name=$(echo "$pkg" | sed 's/[>=<!].*//' | tr -d ' ')
+    # Use pip show to check if installed (works for all packages reliably)
+    if $PYTHON -m pip show "$pkg_name" &>/dev/null; then
+      PRESENT_PKGS+=("$pkg_name")
+      pkg_ver=$($PYTHON -m pip show "$pkg_name" 2>/dev/null | grep '^Version' | awk '{print $2}')
+      print_ok "$pkg_name ($pkg_ver) already installed"
+    else
+      MISSING_PKGS+=("$pkg")
+      print_info "$pkg_name  -->  will install"
+    fi
+  done < requirements.txt
+
+  echo ""
+
+  if [ ${#MISSING_PKGS[@]} -eq 0 ]; then
+    print_ok "All packages are already installed. Nothing to do."
+  else
+    echo "  Installing ${#MISSING_PKGS[@]} missing package(s)..."
+    echo ""
+    INSTALL_FAILED=0
+    for pkg in "${MISSING_PKGS[@]}"; do
+      pkg_name=$(echo "$pkg" | sed 's/[>=<!].*//' | tr -d ' ')
+      echo -n "    Installing $pkg_name... "
+      if $PYTHON -m pip install --quiet "$pkg"; then
+        pkg_ver=$($PYTHON -m pip show "$pkg_name" 2>/dev/null | grep '^Version' | awk '{print $2}')
+        echo "${GREEN}done${RESET} (v$pkg_ver)"
+      else
+        echo "${RED}FAILED${RESET}"
+        INSTALL_FAILED=1
+      fi
+    done
+    echo ""
+    if [ $INSTALL_FAILED -eq 1 ]; then
+      echo "  ${YELLOW}One or more packages failed to install.${RESET}"
+      echo "  You can try running manually:  pip install -r requirements.txt"
+      echo ""
+    else
+      print_ok "All packages installed successfully."
+    fi
+  fi
+fi
 
 # ─── First-run Gmail auth (if credentials.json exists) ───────────────────────
 if [ "$EMAIL_PROVIDER" = "gmail" ] && [ "$MISSING_CREDS" = "false" ]; then
